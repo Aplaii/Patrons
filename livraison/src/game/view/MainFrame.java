@@ -25,11 +25,12 @@ public class MainFrame extends JFrame {
         this.commandManager = commandManager;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 600);
+        setSize(1024, 800);
+        setResizable(false);
         setLayout(new BorderLayout());
 
         gamePanel = new GamePanel(model);
-        mouseController = new MouseController(model, gamePanel, commandManager);
+        mouseController = new MouseController(model, commandManager);
         gamePanel.setController(mouseController);
 
         controlPanel = new ControlPanel(model, commandManager, mouseController);
