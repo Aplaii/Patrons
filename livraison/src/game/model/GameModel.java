@@ -122,11 +122,44 @@ public class GameModel implements ShapeListener {
     }
 
     public double getTotalBlueArea() {
-        double total = 0;
+        if (blueShapes.isEmpty())
+            return 0;
+
+        java.awt.geom.Area union = new java.awt.geom.Area();
         for (IShape shape : blueShapes) {
-            total += shape.getArea();
+            union.add(new java.awt.geom.Area(shape.getAwtShape()));
         }
-        return total;
+        return calculateArea(union);
+    }
+
+    private double calculateArea(java.awt.geom.Area area) {
+        double totalArea = 0;
+        java.awt.geom.PathIterator iterator = area.getPathIterator(null, 1.0);
+        double[] coords = new double[6];
+        double startX = 0, startY = 0;
+        double curX = 0, curY = 0;
+
+        while (!iterator.isDone()) {
+            int type = iterator.currentSegment(coords);
+            switch (type) {
+                case java.awt.geom.PathIterator.SEG_MOVETO:
+                    startX = coords[0];
+                    startY = coords[1];
+                    curX = startX;
+                    curY = startY;
+                    break;
+                case java.awt.geom.PathIterator.SEG_LINETO:
+                    totalArea += (curX * coords[1] - coords[0] * curY);
+                    curX = coords[0];
+                    curY = coords[1];
+                    break;
+                case java.awt.geom.PathIterator.SEG_CLOSE:
+                    totalArea += (curX * startY - startX * curY);
+                    break;
+            }
+            iterator.next();
+        }
+        return Math.abs(totalArea) / 2.0;
     }
 
     public IShape getShapeAt(java.awt.geom.Point2D p) {
