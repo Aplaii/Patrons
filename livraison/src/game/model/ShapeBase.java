@@ -1,14 +1,13 @@
 package game.model;
 
 import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
 
-/**
- * Classe abstraite de base pour factoriser le code commun aux formes,
- * telles que la couleur et l'état de sélection.
- */
 public abstract class ShapeBase implements IShape {
     protected Color color;
     protected boolean selected = false;
+    protected List<ShapeListener> listeners = new ArrayList<>();
 
     public ShapeBase(Color color) {
         this.color = color;
@@ -22,6 +21,7 @@ public abstract class ShapeBase implements IShape {
     @Override
     public void setColor(Color color) {
         this.color = color;
+        notifyShapeListeners();
     }
 
     @Override
@@ -32,6 +32,23 @@ public abstract class ShapeBase implements IShape {
     @Override
     public void setSelected(boolean selected) {
         this.selected = selected;
+        notifyShapeListeners();
+    }
+
+    @Override
+    public void addShapeListener(ShapeListener listener) {
+        listeners.add(listener);
+    }
+
+    @Override
+    public void removeShapeListener(ShapeListener listener) {
+        listeners.remove(listener);
+    }
+
+    protected void notifyShapeListeners() {
+        for (ShapeListener l : listeners) {
+            l.shapeChanged(this);
+        }
     }
 
     @Override

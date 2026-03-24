@@ -7,9 +7,6 @@ import java.awt.geom.Area;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 
-/**
- * Implémentation concrète d'un Rectangle (aligné sur les axes X et Y).
- */
 public class RectangleShape extends ShapeBase {
     private double x, y, width, height;
 
@@ -54,6 +51,7 @@ public class RectangleShape extends ShapeBase {
     public void translate(double dx, double dy) {
         x += dx;
         y += dy;
+        notifyShapeListeners();
     }
 
     @Override
@@ -62,6 +60,7 @@ public class RectangleShape extends ShapeBase {
         y = center.getY() + (y - center.getY()) * factor;
         width *= factor;
         height *= factor;
+        notifyShapeListeners();
     }
 
     @Override

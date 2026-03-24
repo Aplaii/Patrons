@@ -7,9 +7,6 @@ import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 
-/**
- * Implémentation concrète d'un Cercle.
- */
 public class Circle extends ShapeBase {
     private double x, y, radius;
 
@@ -53,14 +50,15 @@ public class Circle extends ShapeBase {
     public void translate(double dx, double dy) {
         x += dx;
         y += dy;
+        notifyShapeListeners();
     }
 
     @Override
     public void scale(double factor, Point2D center) {
-        // Simple scaling
         x = center.getX() + (x - center.getX()) * factor;
         y = center.getY() + (y - center.getY()) * factor;
         radius *= factor;
+        notifyShapeListeners();
     }
 
     @Override

@@ -5,10 +5,6 @@ import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 import java.awt.Shape;
 
-/**
- * Interface représentant une forme géométrique dans le jeu.
- * Protocole commun (Operations) que toutes les formes devront implémenter.
- */
 public interface IShape extends Cloneable {
     void draw(Graphics2D g2d);
 
@@ -33,4 +29,8 @@ public interface IShape extends Cloneable {
     Shape getAwtShape();
 
     IShape clone();
+
+    void addShapeListener(ShapeListener listener);
+
+    void removeShapeListener(ShapeListener listener);
 }
