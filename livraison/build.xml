@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="JeuDesFormes" default="all" basedir=".">
+    
+    <property name="src.dir" value="src"/>
+    <property name="build.dir" value="build"/>
+    <property name="dist.dir" value="dist"/>
+    <property name="doc.dir" value="doc"/>
+    <property name="main.class" value="game.Main"/>
+
+    <!-- Initialisation -->
+    <target name="init">
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+        <mkdir dir="${doc.dir}"/>
+    </target>
+
+    <!-- Compilation -->
+    <target name="compile" depends="init" description="Compile les sources java">
+        <javac srcdir="${src.dir}" destdir="${build.dir}" includeantruntime="false"/>
+    </target>
+
+    <!-- Création de l'exécutable Jar -->
+    <target name="jar" depends="compile" description="Génère l'exécutable (JeuDesFormes.jar)">
+        <jar destfile="${dist.dir}/JeuDesFormes.jar" basedir="${build.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="${main.class}"/>
+            </manifest>
+        </jar>
+    </target>
+
+    <!-- Génération de la Javadoc -->
+    <target name="javadoc" depends="init" description="Génère la documentation Javadoc">
+        <javadoc sourcepath="${src.dir}" destdir="javadoc" packagenames="game.*"
+                 windowtitle="Jeu des Formes 2D - API"
+                 doctitle="Jeu des Formes 2D"
+                 header="Jeu des Formes 2D"
+                 encoding="UTF-8" docencoding="UTF-8" charset="UTF-8"
+                 author="true" version="true"
+                 use="true"
+                 noqualifier="java.lang:java.util:java.awt:javax.swing"/>
+    </target>
+
+    <!-- Nettoyage -->
+    <target name="clean" description="Nettoie les fichiers de compilation">
+        <delete dir="${build.dir}"/>
+    </target>
+
+    <!-- Construction complète -->
+    <target name="all" depends="jar, javadoc, clean" description="Compile, crée le jar, génère la doc et nettoie"/>
+
+</project>
