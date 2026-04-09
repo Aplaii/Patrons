@@ -1,229 +1,170 @@
 package game.controller;
 
-import java.awt.Color;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.geom.Point2D;
-import javax.swing.SwingUtilities;
-
+import java.util.function.Consumer;
 import game.command.CommandManager;
-import game.command.CreateShapeCommand;
-import game.command.MoveShapeCommand;
-import game.command.ResizeShapeCommand;
-import game.model.Circle;
 import game.model.GameModel;
-import game.model.IShape;
-import game.model.RectangleShape;
-import game.view.GamePanel;
+import game.shapes.*;
+import game.controller.state.*;
 
 /**
- * Contrôleur principal gérant les interactions à la souris (MVC).
- * Il intercepte les clics pour créer, sélectionner, déplacer
- * ou redimensionner les formes, puis instancie les Commandes appropriées.
+ * Contrôleur principal de la souris (Design Pattern State).
+ * <p>
+ * Gère les interactions souris de l'utilisateur en déléguant le traitement
+ * des événements à l'état courant ({@link ControllerState}).
+ * Permet de basculer entre les différents modes : sélection, création
+ * de cercle, création de rectangle, suppression et modification.
+ * </p>
+ *
+ * @see ControllerState
+ * @see SelectionState
+ * @see CircleCreationState
+ * @see RectangleCreationState
+ * @see SuppressionState
+ * @see ModificationState
  */
 public class MouseController extends MouseAdapter {
+    /** Le modèle de données du jeu. */
     private GameModel model;
-    private GamePanel view;
+    /** Le gestionnaire de commandes pour l'historique undo/redo. */
     private CommandManager commandManager;
+    /** L'état courant du contrôleur. */
+    private ControllerState currentState;
+    /** Observateur notifié lors des changements d'état. */
+    private Consumer<String> stateObserver;
 
-    private ShapeType currentShapeType = ShapeType.CIRCLE;
-    private IShape selectedShape = null;
-    private Point2D lastMousePos;
-
-    private boolean isDragging = false;
-    private boolean isResizing = false;
-    private boolean isCreating = false;
-
-    private Point2D resizeCenter;
-    private Point2D creationStartPos;
-    private IShape previewShape = null;
-
-    private double accumulatedDx = 0;
-    private double accumulatedDy = 0;
-    private double accumulatedScale = 1.0;
-
-    public MouseController(GameModel model, GamePanel view, CommandManager commandManager) {
+    /**
+     * Construit un nouveau contrôleur de souris.
+     * L'état initial est {@link SelectionState}.
+     *
+     * @param model          Le modèle de jeu.
+     * @param commandManager Le gestionnaire de commandes.
+     */
+    public MouseController(GameModel model, CommandManager commandManager) {
         this.model = model;
-        this.view = view;
         this.commandManager = commandManager;
+        this.currentState = new SelectionState(this, model);
     }
 
-    public void setCurrentShapeType(ShapeType type) {
-        this.currentShapeType = type;
+    /**
+     * Définit un observateur qui sera notifié à chaque changement d'état.
+     *
+     * @param observer Le consommateur recevant le nom de l'état courant.
+     */
+    public void setStateObserver(Consumer<String> observer) {
+        this.stateObserver = observer;
+        updateObserver();
     }
 
-    public IShape getSelectedShape() {
-        return selectedShape;
-    }
-
-    public void deleteSelectedShape() {
-        if (selectedShape != null) {
-            commandManager.executeCommand(new game.command.DeleteShapeCommand(model, selectedShape));
-            selectedShape = null;
-            model.deselectAll();
+    /**
+     * Notifie l'observateur d'un changement d'état avec un nom d'état spécifique.
+     *
+     * @param stateName Le nom de l'état à notifier.
+     */
+    public void notifyStateChange(String stateName) {
+        if (stateObserver != null) {
+            stateObserver.accept(stateName);
         }
     }
 
+    /**
+     * Met à jour l'observateur avec le nom de l'état courant.
+     */
+    private void updateObserver() {
+        if (stateObserver != null && currentState != null) {
+            stateObserver.accept(currentState.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * Bascule le contrôleur en mode création de cercle.
+     * Désélectionne toutes les formes et notifie l'observateur.
+     */
+    public void setModeCircleCreation() {
+        this.currentState = new CircleCreationState(this, model);
+        model.deselectAll();
+        updateObserver();
+    }
+
+    /**
+     * Bascule le contrôleur en mode création de rectangle.
+     * Désélectionne toutes les formes et notifie l'observateur.
+     */
+    public void setModeRectangleCreation() {
+        this.currentState = new RectangleCreationState(this, model);
+        model.deselectAll();
+        updateObserver();
+    }
+
+    /**
+     * Bascule le contrôleur en mode suppression.
+     * Désélectionne toutes les formes et notifie l'observateur.
+     */
+    public void setModeSuppression() {
+        this.currentState = new SuppressionState(this, model);
+        model.deselectAll();
+        updateObserver();
+    }
+
+    /**
+     * Bascule le contrôleur en mode sélection.
+     * Désélectionne toutes les formes et notifie l'observateur.
+     */
+    public void setModeSelection() {
+        this.currentState = new SelectionState(this, model);
+        model.deselectAll();
+        updateObserver();
+    }
+
+    /**
+     * Bascule le contrôleur en mode modification pour une forme donnée.
+     * La forme est sélectionnée visuellement (avec les poignées de contrôle)
+     * et le modèle est notifié du changement.
+     *
+     * @param shape La forme à modifier.
+     */
+    public void setModeModification(IShape shape) {
+        model.deselectAll();
+        shape.setSelected(true);
+        this.currentState = new ModificationState(this, model, shape);
+        model.notifyListeners();
+        updateObserver();
+    }
+
+    /**
+     * Retourne le gestionnaire de commandes associé à ce contrôleur.
+     *
+     * @return Le {@link CommandManager} utilisé pour l'historique d'actions.
+     */
+    public CommandManager getCommandManager() {
+        return commandManager;
+    }
+
+    /**
+     * {@inheritDoc}
+     * Délègue l'événement à l'état courant.
+     */
     @Override
     public void mousePressed(MouseEvent e) {
-        Point2D p = e.getPoint();
-        lastMousePos = p;
-
-        IShape clickedShape = model.getShapeAt(p);
-
-        if (clickedShape != null) {
-            model.deselectAll();
-            selectedShape = clickedShape;
-            selectedShape.setSelected(true);
-            model.notifyListeners();
-
-            if (SwingUtilities.isRightMouseButton(e) || e.isShiftDown()) {
-                isResizing = true;
-                accumulatedScale = 1.0;
-                resizeCenter = new Point2D.Double(selectedShape.getAwtShape().getBounds2D().getCenterX(),
-                        selectedShape.getAwtShape().getBounds2D().getCenterY());
-            } else {
-                isDragging = true;
-                accumulatedDx = 0;
-                accumulatedDy = 0;
-            }
-        } else {
-            model.deselectAll();
-            selectedShape = null;
-
-            isCreating = true;
-            creationStartPos = p;
-
-            if (currentShapeType == ShapeType.CIRCLE) {
-                previewShape = new Circle(p.getX(), p.getY(), 1, Color.BLUE);
-            } else {
-                previewShape = new RectangleShape(p.getX(), p.getY(), 1, 1, Color.BLUE);
-            }
-
-            if (model.canAddBlueShape(previewShape)) {
-                model.addBlueShape(previewShape);
-            } else {
-                previewShape = null;
-            }
-        }
+        currentState.mousePressed(e);
     }
 
+    /**
+     * {@inheritDoc}
+     * Délègue l'événement à l'état courant.
+     */
     @Override
     public void mouseDragged(MouseEvent e) {
-        Point2D p = e.getPoint();
-        double dx = p.getX() - lastMousePos.getX();
-        double dy = p.getY() - lastMousePos.getY();
-
-        if (isCreating && previewShape != null) {
-            model.removeBlueShape(previewShape);
-
-            IShape newPreview;
-            if (currentShapeType == ShapeType.CIRCLE) {
-                double radius = creationStartPos.distance(p);
-                newPreview = new Circle(creationStartPos.getX(), creationStartPos.getY(), radius, Color.BLUE);
-            } else {
-                double x = Math.min(creationStartPos.getX(), p.getX());
-                double y = Math.min(creationStartPos.getY(), p.getY());
-                double w = Math.abs(creationStartPos.getX() - p.getX());
-                double h = Math.abs(creationStartPos.getY() - p.getY());
-                newPreview = new RectangleShape(x, y, w, h, Color.BLUE);
-            }
-
-            if (model.canAddBlueShape(newPreview)) {
-                previewShape = newPreview;
-            }
-            model.addBlueShape(previewShape);
-        } else if (isDragging && selectedShape != null) {
-            // Tentative de déplacement combiné (dx, dy)
-            selectedShape.translate(dx, dy);
-            if (!model.canMoveOrResizeBlueShape(selectedShape)) {
-                // Annuler le déplacement combiné et revenir à la position d'origine
-                selectedShape.translate(-dx, -dy);
-
-                // Glissement axial : tester X seul via un clone
-                IShape testX = selectedShape.clone();
-                testX.translate(dx, 0);
-                boolean canX = model.canMoveOrResizeBlueShape(testX);
-
-                // Glissement axial : tester Y seul via un clone (depuis position d'origine)
-                IShape testY = selectedShape.clone();
-                testY.translate(0, dy);
-                boolean canY = model.canMoveOrResizeBlueShape(testY);
-
-                // Appliquer les mouvements validés
-                if (canX) {
-                    selectedShape.translate(dx, 0);
-                    accumulatedDx += dx;
-                }
-                if (canY) {
-                    selectedShape.translate(0, dy);
-                }
-                if (canX || canY) {
-                    model.notifyListeners();
-                }
-            } else {
-                accumulatedDx += dx;
-                model.notifyListeners();
-            }
-            lastMousePos = p; // toujours mis à jour pour continuer à tracker la souris
-        } else if (isResizing && selectedShape != null) {
-            double factor = 1.0 + (dx + dy) * 0.01;
-            if (factor <= 0.1)
-                factor = 0.1;
-
-            selectedShape.scale(factor, resizeCenter);
-            if (!model.canMoveOrResizeBlueShape(selectedShape)) {
-                // Collision : la forme reste bloquée mais on suit quand même la souris
-                selectedShape.scale(1.0 / factor, resizeCenter);
-            } else {
-                accumulatedScale *= factor;
-                model.notifyListeners();
-            }
-            lastMousePos = p; // toujours mis à jour pour continuer à tracker la souris
-        }
+        currentState.mouseDragged(e);
     }
 
+    /**
+     * {@inheritDoc}
+     * Délègue l'événement à l'état courant.
+     */
     @Override
     public void mouseReleased(MouseEvent e) {
-        if (isCreating) {
-            if (previewShape != null) {
-                model.removeBlueShape(previewShape);
-
-                // If just a quick click, apply a default size if possible
-                if (creationStartPos.distance(e.getPoint()) < 5) {
-                    IShape defaultShape;
-                    if (currentShapeType == ShapeType.CIRCLE) {
-                        defaultShape = new Circle(creationStartPos.getX(), creationStartPos.getY(), 30, Color.BLUE);
-                    } else {
-                        defaultShape = new RectangleShape(creationStartPos.getX() - 30, creationStartPos.getY() - 30,
-                                60, 60, Color.BLUE);
-                    }
-                    if (model.canAddBlueShape(defaultShape)) {
-                        previewShape = defaultShape;
-                    } else {
-                        previewShape = null; // Cannot inject default size due to collision
-                    }
-                }
-
-                if (previewShape != null) {
-                    commandManager.executeCommand(new CreateShapeCommand(model, previewShape));
-                }
-            }
-            isCreating = false;
-        } else if (selectedShape != null) {
-            if (isDragging && (accumulatedDx != 0 || accumulatedDy != 0)) {
-                selectedShape.translate(-accumulatedDx, -accumulatedDy);
-                commandManager.executeCommand(new MoveShapeCommand(model, selectedShape, accumulatedDx, accumulatedDy));
-            } else if (isResizing && accumulatedScale != 1.0) {
-                selectedShape.scale(1.0 / accumulatedScale, resizeCenter);
-                commandManager
-                        .executeCommand(new ResizeShapeCommand(model, selectedShape, accumulatedScale, resizeCenter));
-            }
-        }
-        isDragging = false;
-        isResizing = false;
-        accumulatedDx = 0;
-        accumulatedDy = 0;
-        accumulatedScale = 1.0;
+        currentState.mouseReleased(e);
     }
 }
